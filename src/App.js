@@ -1,48 +1,53 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import "./App.css";
 
-const sampleText = `The quick brown fox jumps over the lazy dog. This is a test to measure how fast you can type within 30 seconds. Typing speed is measured in words per minute (WPM).To improve your speed, practice typing regularly. 
-Accuracy is just as important as speed, so focus on both.`;
+const sampleText = `The quick brown fox jumps over the lazy dog. This is a test to measure how fast you can type within 30 seconds. Typing speed is measured in words per minute (WPM). To improve your speed, practice typing regularly. Accuracy is just as important as speed, so focus on both.`;
 
 const TypingSpeedTest = () => {
   const [inputText, setInputText] = useState("");
   const [timeLeft, setTimeLeft] = useState(30);
   const [isTyping, setIsTyping] = useState(false);
   const [wpm, setWpm] = useState(0);
-  const [highlightedText, setHighlightedText] = useState([]);
+  const [startTime, setStartTime] = useState(null);
 
-  const calculateWPM = useCallback(() => {
-    const wordsTyped = inputText.trim().split(/\s+/).length;
-    setWpm(Math.round((wordsTyped * 60) / 30));
-  }, [inputText]);
-
-  useEffect(() => {
-    let timer;
-    if (isTyping && timeLeft > 0) {
-      timer = setInterval(() => {
-        setTimeLeft((prevTime) => prevTime - 1);
-      }, 1000);
-    } else if (timeLeft === 0) {
-      clearInterval(timer);
-      calculateWPM();
-    }
-    return () => clearInterval(timer);
-  }, [isTyping, timeLeft, calculateWPM]);
-
-  const handleInputChange = (e) => {
-    if (!isTyping) setIsTyping(true);
-    const userInput = e.target.value;
-
-    // ✅ Ensure text updates properly
-    setInputText(userInput);
-    setHighlightedText(validateText(userInput));
-  };
-
-  const validateText = (input) => {
-    return input.split("").map((char, index) => ({
+  
+  const highlightedText = useMemo(() => {
+    return inputText.split("").map((char, index) => ({
       char,
       correct: sampleText[index] === char,
     }));
+  }, [inputText]);
+
+  const calculateWPM = useCallback(() => {
+    const wordsTyped = inputText.trim().split(/\s+/).length;
+    setWpm(wordsTyped * 2); 
+  }, [inputText]);
+
+  useEffect(() => {
+    let timerInterval;
+    if (isTyping) {
+      if (!startTime) setStartTime(Date.now());
+
+      timerInterval = setInterval(() => {
+        const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+        const remainingTime = 30 - elapsedTime;
+        if (remainingTime >= 0) {
+          setTimeLeft(remainingTime);
+        } else {
+          clearInterval(timerInterval);
+          setTimeLeft(0);
+          calculateWPM();
+          setIsTyping(false);
+        }
+      }, 100); 
+    }
+
+    return () => clearInterval(timerInterval); 
+  }, [isTyping, startTime, calculateWPM]);
+
+  const handleInputChange = (e) => {
+    if (!isTyping) setIsTyping(true);
+    setInputText(e.target.value);
   };
 
   const resetTest = () => {
@@ -50,7 +55,7 @@ const TypingSpeedTest = () => {
     setTimeLeft(30);
     setIsTyping(false);
     setWpm(0);
-    setHighlightedText([]);
+    setStartTime(null);
   };
 
   return (
@@ -62,9 +67,7 @@ const TypingSpeedTest = () => {
         {highlightedText.map((charObj, index) => (
           <span
             key={index}
-            className={
-              charObj.correct ? "typing-text-correct" : "typing-text-wrong"
-            }
+            className={charObj.correct ? "typing-text-correct" : "typing-text-wrong"}
           >
             {charObj.char}
           </span>
